@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project Files Viewer</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #eee; }
+        select, input[type=number] { margin-right: 1em; }
+    </style>
+</head>
+<body>
+    <h1>Project Files Viewer</h1>
+    <form method="get" style="display:inline;">
+        <label for="project">Project:</label>
+        <select name="project" id="project" onchange="this.form.submit()">
+            {% for p in projects %}
+                <option value="{{p}}" {% if p==project %}selected{% endif %}>{{p}}</option>
+            {% endfor %}
+        </select>
+        <label for="min_stars">Min Repo Stars:</label>
+        <input type="number" name="min_stars" id="min_stars" value="{{min_stars}}" min="0" onchange="this.form.submit()">
+        <label for="hide_checked">Hide Checked:</label>
+        <input type="checkbox" name="hide_checked" id="hide_checked" value="on" {% if hide_checked %}checked{% endif %} onchange="this.form.submit()">
+    </form>
+    <h2>Files for Project: {{project}}</h2>
+    <table>
+        <tr>
+            <th>File Name</th>
+            <th>Path</th>
+            <th>Repository</th>
+            <th>Stars</th>
+            <th>Repo URL</th>
+            <th>File URL</th>
+            <th>Checked</th>
+        </tr>
+        {% for f in files %}
+        <tr>
+            <td>{{f['name']}}</td>
+            <td>{{f['path']}}</td>
+            <td>{{f['repo_name']}}</td>
+            <td>{{f['stars']}}</td>
+            <td><a href="{{f['repo_url']}}" target="_blank">Repo</a></td>
+            <td><a href="{{f['file_url']}}" target="_blank">File</a></td>
+            <td>
+                {% if f['checked'] %}
+                    <span style="color:green;font-weight:bold;">✔</span>
+                {% else %}
+                    <form method="post" action="/check/{{f['id']}}" style="display:inline;">
+                        <button type="submit">Mark Checked</button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <div style="margin-top: 1em;">
+        {% if total_pages > 1 %}
+            <form method="get" style="display:inline;">
+                <input type="hidden" name="project" value="{{project}}">
+                <input type="hidden" name="min_stars" value="{{min_stars}}">
+                <button type="submit" name="page" value="1" {% if page == 1 %}disabled{% endif %}>First</button>
+                <button type="submit" name="page" value="{{page-1}}" {% if page == 1 %}disabled{% endif %}>Previous</button>
+                Page {{page}} of {{total_pages}}
+                <button type="submit" name="page" value="{{page+1}}" {% if page == total_pages %}disabled{% endif %}>Next</button>
+                <button type="submit" name="page" value="{{total_pages}}" {% if page == total_pages %}disabled{% endif %}>Last</button>
+            </form>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Ignore Python cache and environment files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+ctrl_f_vuln_config.json
+# Ignore SQLite database
+ctrl_f_vuln.db
+# Ignore results and data folders
+results_*/
+*.sqlite3
+# Ignore VSCode settings
+.vscode/
