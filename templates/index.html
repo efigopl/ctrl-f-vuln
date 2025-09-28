@@ -21,8 +21,8 @@
         </select>
         <label for="min_stars">Min Repo Stars:</label>
         <input type="number" name="min_stars" id="min_stars" value="{{min_stars}}" min="0" onchange="this.form.submit()">
-        <label for="hide_checked">Hide Checked:</label>
-        <input type="checkbox" name="hide_checked" id="hide_checked" value="on" {% if hide_checked %}checked{% endif %} onchange="this.form.submit()">
+    <label for="show_checked">Show Checked:</label>
+    <input type="checkbox" name="show_checked" id="show_checked" value="on" {% if show_checked %}checked{% endif %} onchange="this.form.submit()">
     </form>
     <h2>Files for Project: {{project}}</h2>
     <table>
@@ -39,7 +39,7 @@
         <tr>
             <td>{{f['name']}}</td>
             <td>{{f['path']}}</td>
-            <td>{{f['repo_name']}}</td>
+            <td><a href="/repo/{{f['repo_id']}}">{{f['repo_name']}}</a></td>
             <td>{{f['stars']}}</td>
             <td><a href="{{f['repo_url']}}" target="_blank">Repo</a></td>
             <td><a href="{{f['file_url']}}" target="_blank">File</a></td>

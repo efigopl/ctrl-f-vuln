@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Repository Details</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #eee; }
+        .checked { color: green; font-weight: bold; }
+        .button-row { margin: 1em 0; }
+        .button-row form { display: inline-block; margin-right: 1em; }
+    </style>
+</head>
+<body>
+    <h1>Repository: {{repo_name}}</h1>
+    <p><a href="{{repo_url}}" target="_blank">Open on GitHub</a></p>
+    {% if is_cloned %}
+        <div class="status">
+            <p style="color: green;">✓ Repository is cloned</p>
+            <p>Location: {{repo_dir}}</p>
+            <div class="button-row">
+                <form method="post" action="/repo/{{repo_id}}/check_all">
+                    <button type="submit">Mark All Files as Checked</button>
+                </form>
+                <form method="post" action="/repo/{{repo_id}}/clone">
+                    <button type="submit">Open in VS Code</button>
+                </form>
+            </div>
+        </div>
+    {% else %}
+        <div class="status">
+            <p style="color: #666;">Repository not cloned yet</p>
+            <div class="button-row">
+                <form method="post" action="/repo/{{repo_id}}/check_all">
+                    <button type="submit">Mark All Files as Checked</button>
+                </form>
+                <form method="post" action="/repo/{{repo_id}}/clone">
+                    <button type="submit">Clone and Open in VS Code</button>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+    <h2>Files</h2>
+    <table>
+        <tr>
+            <th>File Name</th>
+            <th>Path</th>
+            <th>Search Queries</th>
+            <th>File URL</th>
+            <th>Checked</th>
+        </tr>
+        {% for f in files %}
+        <tr>
+            <td>{{f['name']}}</td>
+            <td>{{f['path']}}</td>
+            <td>
+                {% if f['search_queries'] %}
+                    {% for query in f['search_queries'].split(',') %}
+                        <div style="margin-bottom: 4px;">{{query}}</div>
+                    {% endfor %}
+                {% endif %}
+            </td>
+            <td><a href="{{f['file_url']}}" target="_blank">File</a></td>
+            <td>
+                {% if f['checked'] %}
+                    <span class="checked">✔</span>
+                {% else %}
+                    <form method="post" action="/check/{{f['id']}}" style="display:inline;">
+                        <button type="submit">Mark Checked</button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <p><a href="/">Back to project view</a></p>
+</body>
+</html>
