@@ -72,8 +72,36 @@ python web_viewer.py
 ```
 Then open http://127.0.0.1:5000/.
 
-The viewer binds to localhost by default. It can clone repositories and launch an editor,
-so do not expose it on a shared interface.
+Choose a different interface or port with flags, which override `CTRLF_HOST` and
+`CTRLF_PORT`:
+```sh
+python web_viewer.py --port 8080                  # localhost, different port
+python web_viewer.py --host 0.0.0.0 --port 8080   # every IPv4 interface
+python web_viewer.py --host 192.168.1.10          # one specific interface
+python web_viewer.py --host ::1                   # IPv6 loopback
+python web_viewer.py --port 0                     # let the OS pick a free port
+```
+
+| Flag | Purpose |
+| --- | --- |
+| `--host`, `--interface` | Interface to bind [`127.0.0.1`] |
+| `-p`, `--port` | Port to listen on; `0` picks a free one [`5000`] |
+| `--db` | SQLite database path |
+| `--debug` / `--no-debug` | Flask reloader and debugger |
+| `-v`, `--verbose` | Debug logging |
+
+The viewer binds to localhost by default, and for good reason: it has no
+authentication and can clone repositories and launch an editor on the machine it runs
+on. Binding to a reachable interface logs a warning; prefer an SSH tunnel
+(`ssh -L 5000:127.0.0.1:5000 host`) or a firewall rule over exposing it directly.
+Debug mode on a non-loopback interface is refused outright, because the Werkzeug
+debugger would let anyone who can reach the port run code on that machine.
+
+For a real deployment, point a WSGI server at the app instead of using the development
+server:
+```sh
+gunicorn -b 127.0.0.1:8080 web_viewer:app
+```
 
 **Triage controls**
 - Filter by project, minimum stars, and a substring of the file name, path or repository
@@ -106,7 +134,7 @@ All settings are read from the environment or `.env`. Defaults in brackets.
 | `CTRLF_DB_PATH` | SQLite database path [`ctrl_f_vuln.db`] |
 | `CTRLF_PROJECTS_DIR` | Where repositories are cloned [`projects`] |
 | `CTRLF_EDITOR` | Editor command; auto-detected from PATH when unset |
-| `CTRLF_HOST` / `CTRLF_PORT` | Viewer bind address [`127.0.0.1`, `5000`] |
+| `CTRLF_HOST` / `CTRLF_PORT` | Viewer bind address [`127.0.0.1`, `5000`]; `--host`/`--port` win |
 | `CTRLF_DEBUG` | Flask debug mode [`False`] |
 | `CTRLF_LOG_LEVEL` | Logging level [`INFO`] |
 | `CTRLF_PAGE_SIZE` | Rows per page [`100`] |
