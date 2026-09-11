@@ -1,0 +1,27 @@
+[project]
+name = "ctrl-f-vuln"
+version = "0.2.0"
+description = "Search GitHub for code samples and triage them for vulnerabilities."
+requires-python = ">=3.10"
+dependencies = [
+    "Flask>=3.0,<4.0",
+    "requests>=2.31,<3.0",
+    "python-decouple>=3.8,<4.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+ctrl-f-vuln = "ctrlfvuln.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

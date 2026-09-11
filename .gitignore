@@ -5,10 +5,19 @@ __pycache__/
 *.pyd
 .env
 ctrl_f_vuln_config.json
-# Ignore SQLite database
+# Ignore SQLite database (and its write-ahead log side files)
 ctrl_f_vuln.db
+ctrl_f_vuln.db-wal
+ctrl_f_vuln.db-shm
 # Ignore results and data folders
 results_*/
 *.sqlite3
+# Cloned repositories fetched by the viewer
+projects/
 # Ignore VSCode settings
 .vscode/
+# Local environments and vendored dependencies
+.venv/
+venv/
+vendor/
+.pytest_cache/

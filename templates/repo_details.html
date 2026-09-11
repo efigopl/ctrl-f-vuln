@@ -1,79 +1,161 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Repository Details</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 2em; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background: #eee; }
-        .checked { color: green; font-weight: bold; }
-        .button-row { margin: 1em 0; }
-        .button-row form { display: inline-block; margin-right: 1em; }
-    </style>
-</head>
-<body>
-    <h1>Repository: {{repo_name}}</h1>
-    <p><a href="{{repo_url}}" target="_blank">Open on GitHub</a></p>
-    {% if is_cloned %}
-        <div class="status">
-            <p style="color: green;">✓ Repository is cloned</p>
-            <p>Location: {{repo_dir}}</p>
-            <div class="button-row">
-                <form method="post" action="/repo/{{repo_id}}/check_all">
-                    <button type="submit">Mark All Files as Checked</button>
-                </form>
-                <form method="post" action="/repo/{{repo_id}}/clone">
-                    <button type="submit">Open in VS Code</button>
-                </form>
-            </div>
-        </div>
+{% extends "base.html" %}
+{% block title %}{{ repo.full_name }} · ctrl-f-vuln{% endblock %}
+
+{% block topbar %}
+  <a class="crumb" href="{{ url_for('pages.index', **back_args) }}">&larr; Back to files</a>
+{% endblock %}
+
+{% block content %}
+{% set pct = (checked_count / files|length * 100) if files else 0 %}
+
+<section class="card repo-head">
+  <div>
+    <h1>{{ repo.full_name }}</h1>
+    {% if repo.description %}<p class="muted">{{ repo.description }}</p>{% endif %}
+    <p class="chips">
+      <span class="chip">{{ repo.stars|stars }} stars</span>
+      <span class="chip subtle">{{ files|length }} file{{ '' if files|length == 1 else 's' }}</span>
+      <span class="chip subtle">{{ checked_count }} reviewed</span>
+      {% if project %}<span class="chip subtle">{{ project }}</span>{% endif %}
+    </p>
+  </div>
+  <div class="repo-head-actions">
+    <a class="button ghost" href="{{ repo.html_url }}" target="_blank" rel="noopener">Open on GitHub</a>
+  </div>
+</section>
+
+<section class="card clone-card">
+  <div class="clone-status">
+    {% if clone_path %}
+      <strong class="ok">Cloned locally</strong>
+      <div class="mono small muted">{{ clone_path }}</div>
     {% else %}
-        <div class="status">
-            <p style="color: #666;">Repository not cloned yet</p>
-            <div class="button-row">
-                <form method="post" action="/repo/{{repo_id}}/check_all">
-                    <button type="submit">Mark All Files as Checked</button>
-                </form>
-                <form method="post" action="/repo/{{repo_id}}/clone">
-                    <button type="submit">Clone and Open in VS Code</button>
-                </form>
-            </div>
-        </div>
+      <strong class="muted">Not cloned</strong>
+      {% if target_path %}
+        <div class="mono small muted">Will clone to {{ target_path }}</div>
+      {% endif %}
     {% endif %}
-    <h2>Files</h2>
-    <table>
-        <tr>
-            <th>File Name</th>
-            <th>Path</th>
-            <th>Search Queries</th>
-            <th>File URL</th>
-            <th>Checked</th>
-        </tr>
-        {% for f in files %}
-        <tr>
-            <td>{{f['name']}}</td>
-            <td>{{f['path']}}</td>
-            <td>
-                {% if f['search_queries'] %}
-                    {% for query in f['search_queries'].split(',') %}
-                        <div style="margin-bottom: 4px;">{{query}}</div>
-                    {% endfor %}
-                {% endif %}
-            </td>
-            <td><a href="{{f['file_url']}}" target="_blank">File</a></td>
-            <td>
-                {% if f['checked'] %}
-                    <span class="checked">✔</span>
-                {% else %}
-                    <form method="post" action="/check/{{f['id']}}" style="display:inline;">
-                        <button type="submit">Mark Checked</button>
-                    </form>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
-    <p><a href="/">Back to project view</a></p>
-</body>
-</html>
+  </div>
+
+  <div class="clone-actions">
+    {% if clone_path %}
+      <form method="post" action="{{ url_for('pages.open_repo', repo_id=repo.id) }}">
+        <input type="hidden" name="project" value="{{ project }}">
+        <button type="submit" class="button primary" data-busy="Opening…"
+                {% if not editor_available %}disabled{% endif %}>Open in editor</button>
+      </form>
+    {% else %}
+      <form method="post" action="{{ url_for('pages.clone_repo', repo_id=repo.id) }}">
+        <input type="hidden" name="project" value="{{ project }}">
+        <button type="submit" class="button primary" data-busy="Cloning…">Clone</button>
+      </form>
+      <form method="post" action="{{ url_for('pages.clone_repo', repo_id=repo.id) }}">
+        <input type="hidden" name="project" value="{{ project }}">
+        <input type="hidden" name="open" value="1">
+        <button type="submit" class="button ghost" data-busy="Cloning…"
+                {% if not editor_available %}disabled{% endif %}>Clone &amp; open in editor</button>
+      </form>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('pages.check_all_files', repo_id=repo.id) }}"
+          data-confirm="Mark all {{ files|length }} files in {{ repo.full_name }} as reviewed?">
+      <input type="hidden" name="checked" value="1">
+      <button type="submit" class="button ghost">Mark all reviewed</button>
+    </form>
+    {% if checked_count %}
+      <form method="post" action="{{ url_for('pages.check_all_files', repo_id=repo.id) }}"
+            data-confirm="Mark all {{ files|length }} files in {{ repo.full_name }} as unreviewed?">
+        <input type="hidden" name="checked" value="0">
+        <button type="submit" class="button ghost">Mark all unreviewed</button>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if not editor_available %}
+    <p class="note muted small">
+      No editor found on PATH. Set <code>CTRLF_EDITOR</code> in your <code>.env</code>
+      (for example <code>CTRLF_EDITOR=code</code>) to enable the editor buttons.
+    </p>
+  {% endif %}
+</section>
+
+<div class="progress-wrap standalone">
+  <div class="progress" role="img" aria-label="{{ '%.0f'|format(pct) }} percent reviewed">
+    <div class="progress-bar" style="width: {{ '%.2f'|format(pct) }}%"></div>
+  </div>
+  <span class="mono small" data-progress-label>{{ '%.1f'|format(pct) }}%</span>
+</div>
+
+<div class="bulk-bar" id="bulk-bar" hidden>
+  <strong id="bulk-count">0 selected</strong>
+  <div class="bulk-actions">
+    <button type="button" class="button primary small" data-bulk="1">Mark reviewed</button>
+    <button type="button" class="button ghost small" data-bulk="0">Mark unreviewed</button>
+    <button type="button" class="button ghost small" data-bulk-clear>Clear</button>
+  </div>
+</div>
+
+<div class="table-wrap card">
+  <table class="files" id="files-table" data-project="{{ project }}">
+    <thead>
+      <tr>
+        <th class="col-select">
+          <input type="checkbox" id="select-all" aria-label="Select every file">
+        </th>
+        <th class="col-check">Done</th>
+        <th>File</th>
+        <th>Path</th>
+        <th>Matched queries</th>
+        <th class="col-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in files %}
+      <tr data-file-id="{{ f.id }}" data-file-url="{{ f.file_url }}"
+          data-name="{{ f.name }}" data-path="{{ f.path }}"
+          class="{% if f.checked %}is-checked{% endif %}">
+        <td class="col-select">
+          <input type="checkbox" class="row-select" aria-label="Select {{ f.path }}">
+        </td>
+        <td class="col-check">
+          <form method="post" action="{{ url_for('pages.mark_checked', file_id=f.id) }}"
+                class="check-form">
+            <input type="hidden" name="checked" value="{{ 0 if f.checked else 1 }}">
+            <button type="submit" class="check-toggle"
+                    data-checked="{{ 1 if f.checked else 0 }}"
+                    aria-pressed="{{ 'true' if f.checked else 'false' }}"
+                    title="Toggle reviewed">
+              <span class="tick" aria-hidden="true">✓</span>
+              <span class="sr-only">{{ 'Mark unreviewed' if f.checked else 'Mark reviewed' }}</span>
+            </button>
+          </form>
+        </td>
+        <td class="cell-name">
+          <button type="button" class="linklike preview-trigger">{{ f.name }}</button>
+        </td>
+        <td class="cell-path mono" title="{{ f.path }}">{{ f.path }}</td>
+        <td class="cell-queries">
+          {% for query in f.queries %}
+            <code class="query-chip" title="{{ query }}">{{ query }}</code>
+          {% else %}
+            <span class="muted small">&mdash;</span>
+          {% endfor %}
+        </td>
+        <td class="col-actions">
+          <button type="button" class="button ghost small preview-trigger">Preview</button>
+          <a class="button ghost small" href="{{ f.file_url }}" target="_blank" rel="noopener">GitHub</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr class="no-rows">
+        <td colspan="6">
+          <div class="empty-inline">
+            <strong>No files recorded for this repository.</strong>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ctrl-f-vuln{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f8ef7' stroke-width='2.5'><circle cx='10' cy='10' r='6'/><path d='M14.5 14.5L21 21'/></svg>">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('pages.index') }}">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none"
+           stroke="currentColor" stroke-width="2.5">
+        <circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L21 21"/>
+      </svg>
+      ctrl-f-vuln
+    </a>
+    <div class="topbar-slot">{% block topbar %}{% endblock %}</div>
+    <button type="button" class="button ghost small" data-help-open
+            aria-label="Keyboard shortcuts">Shortcuts <kbd>?</kbd></button>
+  </header>
+
+  <div class="flashes" id="flashes" aria-live="polite">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">
+          <span>{{ message }}</span>
+          <button type="button" class="flash-close" data-dismiss aria-label="Dismiss">&times;</button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+  </div>
+
+  <main id="main">{% block content %}{% endblock %}</main>
+
+  <aside class="drawer" id="preview" hidden aria-label="File preview">
+    <header class="drawer-head">
+      <div class="drawer-title">
+        <strong id="preview-name">&nbsp;</strong>
+        <div class="mono muted small" id="preview-path"></div>
+      </div>
+      <div class="drawer-tools">
+        <span class="matchnav" hidden id="preview-matchnav">
+          <button type="button" class="button ghost small" id="preview-prev-match"
+                  aria-label="Previous match">&uarr;</button>
+          <span class="small mono" id="preview-match-count"></span>
+          <button type="button" class="button ghost small" id="preview-next-match"
+                  aria-label="Next match">&darr;</button>
+        </span>
+        <label class="inline-check" title="Toggle reviewed">
+          <input type="checkbox" id="preview-checked"> reviewed
+        </label>
+        <a class="button ghost small" id="preview-github" target="_blank" rel="noopener">GitHub</a>
+        <button type="button" class="button ghost small" data-drawer-close
+                aria-label="Close preview">&times;</button>
+      </div>
+    </header>
+    <div class="drawer-terms" id="preview-terms" hidden></div>
+    <div class="drawer-body">
+      <p class="drawer-status" id="preview-status"></p>
+      <div class="code" id="preview-code" tabindex="0"></div>
+    </div>
+  </aside>
+
+  <dialog class="help" id="help-dialog">
+    <h2>Keyboard shortcuts</h2>
+    <dl class="shortcuts">
+      <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>Next / previous row</dd>
+      <dt><kbd>x</kbd></dt><dd>Toggle reviewed on the focused row</dd>
+      <dt><kbd>p</kbd> / <kbd>Enter</kbd></dt><dd>Preview the focused file</dd>
+      <dt><kbd>o</kbd></dt><dd>Open the focused file on GitHub</dd>
+      <dt><kbd>s</kbd></dt><dd>Select the focused row for a bulk action</dd>
+      <dt><kbd>n</kbd> / <kbd>N</kbd></dt><dd>Next / previous match inside the preview</dd>
+      <dt><kbd>/</kbd></dt><dd>Focus the filter box</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Close the preview or this dialog</dd>
+      <dt><kbd>?</kbd></dt><dd>Show this help</dd>
+    </dl>
+    <form method="dialog"><button class="button primary">Close</button></form>
+  </dialog>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</body>
+</html>

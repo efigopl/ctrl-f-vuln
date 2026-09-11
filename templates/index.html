@@ -1,72 +1,210 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Project Files Viewer</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 2em; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th { background: #eee; }
-        select, input[type=number] { margin-right: 1em; }
-    </style>
-</head>
-<body>
-    <h1>Project Files Viewer</h1>
-    <form method="get" style="display:inline;">
-        <label for="project">Project:</label>
-        <select name="project" id="project" onchange="this.form.submit()">
-            {% for p in projects %}
-                <option value="{{p}}" {% if p==project %}selected{% endif %}>{{p}}</option>
-            {% endfor %}
-        </select>
-        <label for="min_stars">Min Repo Stars:</label>
-        <input type="number" name="min_stars" id="min_stars" value="{{min_stars}}" min="0" onchange="this.form.submit()">
-    <label for="show_checked">Show Checked:</label>
-    <input type="checkbox" name="show_checked" id="show_checked" value="on" {% if show_checked %}checked{% endif %} onchange="this.form.submit()">
-    </form>
-    <h2>Files for Project: {{project}}</h2>
-    <table>
-        <tr>
-            <th>File Name</th>
-            <th>Path</th>
-            <th>Repository</th>
-            <th>Stars</th>
-            <th>Repo URL</th>
-            <th>File URL</th>
-            <th>Checked</th>
-        </tr>
-        {% for f in files %}
-        <tr>
-            <td>{{f['name']}}</td>
-            <td>{{f['path']}}</td>
-            <td><a href="/repo/{{f['repo_id']}}">{{f['repo_name']}}</a></td>
-            <td>{{f['stars']}}</td>
-            <td><a href="{{f['repo_url']}}" target="_blank">Repo</a></td>
-            <td><a href="{{f['file_url']}}" target="_blank">File</a></td>
-            <td>
-                {% if f['checked'] %}
-                    <span style="color:green;font-weight:bold;">✔</span>
-                {% else %}
-                    <form method="post" action="/check/{{f['id']}}" style="display:inline;">
-                        <button type="submit">Mark Checked</button>
-                    </form>
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
-    <div style="margin-top: 1em;">
-        {% if total_pages > 1 %}
-            <form method="get" style="display:inline;">
-                <input type="hidden" name="project" value="{{project}}">
-                <input type="hidden" name="min_stars" value="{{min_stars}}">
-                <button type="submit" name="page" value="1" {% if page == 1 %}disabled{% endif %}>First</button>
-                <button type="submit" name="page" value="{{page-1}}" {% if page == 1 %}disabled{% endif %}>Previous</button>
-                Page {{page}} of {{total_pages}}
-                <button type="submit" name="page" value="{{page+1}}" {% if page == total_pages %}disabled{% endif %}>Next</button>
-                <button type="submit" name="page" value="{{total_pages}}" {% if page == total_pages %}disabled{% endif %}>Last</button>
-            </form>
-        {% endif %}
+{% extends "base.html" %}
+{% block title %}{{ project or 'ctrl-f-vuln' }} · files{% endblock %}
+
+{% macro sortable(key, label, numeric=false) %}
+  {%- set link = sort_links.get(key) -%}
+  {%- if link -%}
+    <a class="sort{% if link.active %} active{% endif %}" href="{{ link.url }}"
+       {% if link.active %}aria-sort="{{ 'descending' if link.direction == 'desc' else 'ascending' }}"{% endif %}>
+      {{ label }}<span class="sort-arrow" aria-hidden="true">{% if link.active %}{{ '↓' if link.direction == 'desc' else '↑' }}{% endif %}</span>
+    </a>
+  {%- else -%}{{ label }}{%- endif -%}
+{% endmacro %}
+
+{% block topbar %}
+  {% if project %}<span class="muted small">project</span> <strong>{{ project }}</strong>{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if not projects %}
+  <section class="card empty-state">
+    <h1>No projects yet</h1>
+    <p class="muted">Collect some search results before browsing them here.</p>
+    <pre class="code-block">python search_github.py my-project search --query "mysql_query("
+python search_github.py my-project augment</pre>
+    <p class="muted small">Reload this page once a search has stored its first results.</p>
+  </section>
+{% else %}
+
+<form class="card toolbar" method="get" action="{{ url_for('pages.index') }}" id="filter-form">
+  <div class="field">
+    <label for="project">Project</label>
+    <select name="project" id="project" data-autosubmit>
+      {% for name in projects %}
+        <option value="{{ name }}" {% if name == project %}selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="field grow">
+    <label for="q">Filter files</label>
+    <input type="search" name="q" id="q" value="{{ filters.search }}"
+           placeholder="file name, path or repository" autocomplete="off">
+  </div>
+
+  <div class="field">
+    <label for="min_stars">Min stars</label>
+    <input type="number" name="min_stars" id="min_stars" value="{{ filters.min_stars }}"
+           min="0" step="10" data-autosubmit>
+  </div>
+
+  <div class="field check">
+    <input type="checkbox" name="show_checked" id="show_checked" value="on"
+           {% if filters.show_checked %}checked{% endif %} data-autosubmit>
+    <label for="show_checked">Show reviewed</label>
+  </div>
+
+  <input type="hidden" name="sort" value="{{ filters.sort }}">
+  <input type="hidden" name="direction" value="{{ filters.direction }}">
+
+  <div class="field actions">
+    <button type="submit" class="button primary">Apply</button>
+    {% if filters.search or filters.min_stars or filters.show_checked %}
+      <a class="button ghost" href="{{ url_for('pages.index', project=project) }}">Clear</a>
+    {% endif %}
+  </div>
+</form>
+
+{% set pct = (summary.checked / summary.files * 100) if summary.files else 0 %}
+<section class="summary card">
+  <div>
+    <h1>{{ project }}</h1>
+    <p class="muted small">
+      <span data-summary-checked>{{ summary.checked }}</span> of
+      <span data-summary-files>{{ summary.files }}</span> files reviewed
+      across {{ summary.repos }} repositor{{ 'y' if summary.repos == 1 else 'ies' }}
+    </p>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress" role="img"
+         aria-label="{{ '%.0f'|format(pct) }} percent of files reviewed">
+      <div class="progress-bar" style="width: {{ '%.2f'|format(pct) }}%"></div>
     </div>
-</body>
-</html>
+    <span class="mono small" data-progress-label>{{ '%.1f'|format(pct) }}%</span>
+  </div>
+  <div class="chips">
+    <span class="chip"
+          {% if total_capped %}title="Counting stops at {{ total }} to keep the page fast"{% endif %}>
+      {{ total }}{% if total_capped %}+{% endif %} match{{ '' if total == 1 else 'es' }}
+    </span>
+    {% if not filters.show_checked %}<span class="chip subtle">reviewed hidden</span>{% endif %}
+    {% if filters.min_stars %}<span class="chip subtle">&ge; {{ filters.min_stars }} stars</span>{% endif %}
+    {% if filters.search %}<span class="chip subtle">“{{ filters.search }}”</span>{% endif %}
+  </div>
+</section>
+
+<div class="bulk-bar" id="bulk-bar" hidden>
+  <strong id="bulk-count">0 selected</strong>
+  <div class="bulk-actions">
+    <button type="button" class="button primary small" data-bulk="1">Mark reviewed</button>
+    <button type="button" class="button ghost small" data-bulk="0">Mark unreviewed</button>
+    <button type="button" class="button ghost small" data-bulk-clear>Clear</button>
+  </div>
+</div>
+
+<div class="table-wrap card">
+  <table class="files" id="files-table" data-project="{{ project }}">
+    <thead>
+      <tr>
+        <th class="col-select">
+          <input type="checkbox" id="select-all" aria-label="Select every row on this page">
+        </th>
+        <th class="col-check">{{ sortable('checked', 'Done') }}</th>
+        <th>{{ sortable('name', 'File') }}</th>
+        <th>{{ sortable('path', 'Path') }}</th>
+        <th>{{ sortable('repo', 'Repository') }}</th>
+        <th class="num">{{ sortable('stars', 'Stars') }}</th>
+        <th class="col-actions">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in files %}
+      <tr data-file-id="{{ f.id }}" data-file-url="{{ f.file_url }}"
+          data-name="{{ f.name }}" data-path="{{ f.path }}"
+          class="{% if f.checked %}is-checked{% endif %}">
+        <td class="col-select">
+          <input type="checkbox" class="row-select"
+                 aria-label="Select {{ f.path }}">
+        </td>
+        <td class="col-check">
+          <form method="post" action="{{ url_for('pages.mark_checked', file_id=f.id) }}"
+                class="check-form">
+            <input type="hidden" name="checked" value="{{ 0 if f.checked else 1 }}">
+            <button type="submit" class="check-toggle"
+                    data-checked="{{ 1 if f.checked else 0 }}"
+                    aria-pressed="{{ 'true' if f.checked else 'false' }}"
+                    title="Toggle reviewed">
+              <span class="tick" aria-hidden="true">✓</span>
+              <span class="sr-only">{{ 'Mark unreviewed' if f.checked else 'Mark reviewed' }}</span>
+            </button>
+          </form>
+        </td>
+        <td class="cell-name">
+          <button type="button" class="linklike preview-trigger">{{ f.name }}</button>
+        </td>
+        <td class="cell-path mono" title="{{ f.path }}">{{ f.path }}</td>
+        <td class="cell-repo">
+          <a href="{{ url_for('pages.repo_details', repo_id=f.repo_id, project=project) }}">{{ f.repo_name }}</a>
+        </td>
+        <td class="num mono" {% if f.stars is not none and f.stars < 0 %}title="Run 'augment' to fetch star counts"{% endif %}>{{ f.stars|stars }}</td>
+        <td class="col-actions">
+          <button type="button" class="button ghost small preview-trigger">Preview</button>
+          <a class="button ghost small" href="{{ f.file_url }}" target="_blank" rel="noopener">GitHub</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr class="no-rows">
+        <td colspan="7">
+          <div class="empty-inline">
+            <strong>Nothing matches these filters.</strong>
+            {% if not filters.show_checked and summary.checked == summary.files and summary.files %}
+              <span class="muted">Every file in this project has been reviewed.</span>
+            {% endif %}
+            <a class="button ghost small" href="{{ url_for('pages.index', project=project) }}">Clear filters</a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pager and total_pages > 1 %}
+<nav class="pager" aria-label="Pagination">
+  {% if pager.prev %}
+    <a class="button ghost small" href="{{ pager.first }}">First</a>
+    <a class="button ghost small" href="{{ pager.prev }}" rel="prev">Previous</a>
+  {% else %}
+    <span class="button ghost small disabled" aria-disabled="true">First</span>
+    <span class="button ghost small disabled" aria-disabled="true">Previous</span>
+  {% endif %}
+
+  {% for p in pager.numbers %}
+    {% if p.current %}
+      <span class="button primary small" aria-current="page">{{ p.number }}</span>
+    {% else %}
+      <a class="button ghost small" href="{{ p.url }}">{{ p.number }}</a>
+    {% endif %}
+  {% endfor %}
+
+  {% if pager.next %}
+    <a class="button ghost small" href="{{ pager.next }}" rel="next">Next</a>
+    <a class="button ghost small" href="{{ pager.last }}">Last</a>
+  {% else %}
+    <span class="button ghost small disabled" aria-disabled="true">Next</span>
+    <span class="button ghost small disabled" aria-disabled="true">Last</span>
+  {% endif %}
+  <span class="muted small pager-label">
+    Page {{ page }} of {{ total_pages }}{% if total_capped %}+{% endif %}
+  </span>
+</nav>
+{% endif %}
+
+{% if not token_available %}
+<p class="muted small note">
+  No <code>GITHUB_TOKEN</code> configured — file previews fall back to GitHub's
+  unauthenticated rate limit (60 requests per hour).
+</p>
+{% endif %}
+{% endif %}
+{% endblock %}

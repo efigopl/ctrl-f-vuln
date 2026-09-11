@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} · ctrl-f-vuln{% endblock %}
+
+{% block content %}
+<section class="card empty-state">
+  <p class="error-code">{{ code }}</p>
+  <h1>{{ title }}</h1>
+  <p class="muted">{{ message }}</p>
+  <p><a class="button primary" href="{{ url_for('pages.index') }}">Back to files</a></p>
+</section>
+{% endblock %}
