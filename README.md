@@ -68,40 +68,59 @@ python search_github.py php-search stats
 
 ### Web viewer
 ```sh
-python web_viewer.py
+python web_viewer.py [options]
 ```
-Then open http://127.0.0.1:5000/.
-
-Choose a different interface or port with flags, which override `CTRLF_HOST` and
-`CTRLF_PORT`:
-```sh
-python web_viewer.py --port 8080                  # localhost, different port
-python web_viewer.py --host 0.0.0.0 --port 8080   # every IPv4 interface
-python web_viewer.py --host 192.168.1.10          # one specific interface
-python web_viewer.py --host ::1                   # IPv6 loopback
-python web_viewer.py --port 0                     # let the OS pick a free port
-```
+With no options it serves http://127.0.0.1:5000/. The address it binds is logged on
+startup.
 
 | Flag | Purpose |
 | --- | --- |
-| `--host`, `--interface` | Interface to bind [`127.0.0.1`] |
-| `-p`, `--port` | Port to listen on; `0` picks a free one [`5000`] |
-| `--db` | SQLite database path |
-| `--debug` / `--no-debug` | Flask reloader and debugger |
+| `--host ADDRESS`, `--interface ADDRESS` | Interface to bind [`127.0.0.1`] |
+| `-p PORT`, `--port PORT` | Port to listen on; `0` picks a free one [`5000`] |
+| `--db PATH` | SQLite database to read [`CTRLF_DB_PATH`] |
+| `--debug` / `--no-debug` | Flask reloader and debugger [off] |
+| `--allow-unsafe-debug` | Permit `--debug` on a non-loopback interface (see below) |
 | `-v`, `--verbose` | Debug logging |
+| `-h`, `--help` | Show usage and exit |
 
-The viewer binds to localhost by default, and for good reason: it has no
-authentication and can clone repositories and launch an editor on the machine it runs
-on. Binding to a reachable interface logs a warning; prefer an SSH tunnel
-(`ssh -L 5000:127.0.0.1:5000 host`) or a firewall rule over exposing it directly.
-Debug mode on a non-loopback interface is refused outright, because the Werkzeug
-debugger would let anyone who can reach the port run code on that machine.
+Flags override `CTRLF_HOST`, `CTRLF_PORT`, `CTRLF_DEBUG` and `CTRLF_DB_PATH`, so the
+environment sets your usual default and a flag changes it for one run.
 
-For a real deployment, point a WSGI server at the app instead of using the development
-server:
 ```sh
+python web_viewer.py --port 8080                  # localhost, different port
+python web_viewer.py --host 0.0.0.0 --port 8080   # every IPv4 interface
+python web_viewer.py --host ::                    # every interface, IPv4 and IPv6
+python web_viewer.py --host 192.168.1.10          # one specific interface
+python web_viewer.py --host ::1                   # IPv6 loopback
+python web_viewer.py --port 0                     # OS picks a port, printed at startup
+python web_viewer.py --db ./other.db --port 5001  # a second database side by side
+```
+
+An unusable port (outside 0-65535) or a refused debug combination exits with status 2
+without starting the server.
+
+#### Exposing it beyond localhost
+The default bind is localhost for a reason: the viewer has no authentication and can
+clone repositories and launch an editor on the machine it runs on, so anyone who can
+reach the port can do both.
+
+- Binding anywhere non-loopback starts normally but logs a warning.
+- `--debug` on a non-loopback interface is **refused** (exit 2), because the Werkzeug
+  debugger is remote code execution for anyone who can reach it. `--allow-unsafe-debug`
+  overrides the refusal if you genuinely need it; `--debug` on localhost needs nothing.
+
+Prefer tunnelling over exposing the port:
+```sh
+ssh -L 5000:127.0.0.1:5000 you@host   # then browse http://127.0.0.1:5000/ locally
+```
+
+For anything long-lived, run it under a real WSGI server rather than the development
+server. `web_viewer:app` builds the application on first access, so:
+```sh
+pip install gunicorn          # not bundled in requirements.txt
 gunicorn -b 127.0.0.1:8080 web_viewer:app
 ```
+A WSGI server binds the socket itself, so `--host`/`--port` do not apply there.
 
 **Triage controls**
 - Filter by project, minimum stars, and a substring of the file name, path or repository

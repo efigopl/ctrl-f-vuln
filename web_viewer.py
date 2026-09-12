@@ -150,8 +150,22 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     display_host = "127.0.0.1" if host in ("0.0.0.0", "", "::") else host
-    log.info("Serving ctrl-f-vuln on http://%s:%d/ (database: %s)",
-             display_host, port, settings.db_path)
+    if port == 0:
+        # The real port is only known once the socket is bound; Werkzeug prints
+        # it a moment later, so do not invent "http://host:0/" here.
+        log.info(
+            "Serving ctrl-f-vuln on %s with an OS-assigned port (database: %s); "
+            "the bound address is printed below.",
+            display_host,
+            settings.db_path,
+        )
+    else:
+        log.info(
+            "Serving ctrl-f-vuln on http://%s:%d/ (database: %s)",
+            display_host,
+            port,
+            settings.db_path,
+        )
 
     create_app(settings).run(host=host, port=port, debug=debug)
     return 0

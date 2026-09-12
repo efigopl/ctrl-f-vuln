@@ -95,6 +95,27 @@ def test_port_zero_is_allowed(fake_app):
     assert fake_app.run_kwargs["port"] == 0
 
 
+def test_port_zero_does_not_advertise_a_bogus_url(fake_app, caplog):
+    """The real port is unknown until the socket binds, so do not print ':0'."""
+    with caplog.at_level("INFO"):
+        web_viewer.main(["--port", "0"])
+    assert ":0/" not in caplog.text
+    assert "OS-assigned port" in caplog.text
+
+
+def test_a_real_port_is_advertised(fake_app, caplog):
+    with caplog.at_level("INFO"):
+        web_viewer.main(["--host", "127.0.0.1", "--port", "8123"])
+    assert "http://127.0.0.1:8123/" in caplog.text
+
+
+def test_wildcard_bind_suggests_a_reachable_url(fake_app, caplog):
+    """0.0.0.0 is not something you can type into a browser."""
+    with caplog.at_level("INFO"):
+        web_viewer.main(["--host", "0.0.0.0", "--port", "8123"])
+    assert "http://127.0.0.1:8123/" in caplog.text
+
+
 @pytest.mark.parametrize("port", ["-1", "65536", "99999"])
 def test_out_of_range_ports_are_refused(fake_app, port):
     assert web_viewer.main(["--port", port]) == 2
